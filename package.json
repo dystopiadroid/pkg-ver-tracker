@@ -1,0 +1,12 @@
+{
+  "name": "pkg-version-tracker",
+  "version": "1.0.0",
+  "description": "CLI tool to verify/update the current version of a dependency used in a public/private github repository mentioned in a CSV file",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
