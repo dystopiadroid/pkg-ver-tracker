@@ -11,7 +11,7 @@ const prompt = require('prompt-sync')({ sigint: true })
 var checkVersiondata = []
 var updateVersiondata = []
 
-const checkPkgVersion = async (row, pkgName, pkgVersion, updateArg) => {
+const checkPkgVersion = async (row, pkgName, pkgVersion, updateArg, srcUserDetails) => {
   const { name, repo } = row;
   const repoLink = repo.replace("github", "raw.github");
   const metaData = await fetch(`${repoLink}/main/package.json`).then(res => res.json());
@@ -19,7 +19,7 @@ const checkPkgVersion = async (row, pkgName, pkgVersion, updateArg) => {
   
   if(updateArg.isPresent()){
     updatePkgVersion(name, repo, metaData.dependencies[pkgName], metaData.dependencies[pkgName].substring(1) >= pkgVersion
-    , pkgVersion, pkgName, updateArg)
+    , pkgVersion, pkgName, srcUserDetails)
   }
 }
 
@@ -28,49 +28,48 @@ function tabularPrint(name, repo, version , version_satisfied){
   checkVersiondata.push( {name, repo, version , version_satisfied} )
 }
 
-async function updatePkgVersion(name, repo, version , version_satisfied, pkgVersion, pkgName){
+async function updatePkgVersion(name, repo, version , version_satisfied, pkgVersion, pkgName, srcUserDetails){
   updateVersiondata.push( {name, repo, version : version.substring(1), version_satisfied, 
-    update_pr : !version_satisfied ? await pullRequest(name, repo, version, pkgVersion, pkgName) : ""} ) 
+    update_pr : !version_satisfied ? await pullRequest(name, repo, version, pkgVersion, pkgName, srcUserDetails) : ""} ) 
 
     !version_satisfied ? printTable(updateVersiondata) : ""
 }
-async function pullRequest(name, repo, version, pkgVersion, pkgName){
+async function pullRequest(name, repo, version, pkgVersion, pkgName, srcUserDetails){
 
   const repoLink = repo.replace("github", "raw.github");
   const metaData = await fetch(`${repoLink}/main/package.json`).then(res => res.json());
   metaData.dependencies[pkgName] = `^${pkgVersion}`
   const splitRepo = repo.split('/')
   const [username, repoName] = splitRepo.splice(splitRepo.indexOf("github.com") + 1)
-  const srcUsername = prompt("Enter your github username : ")
 
   const octokit = new Octokit({
     auth: process.env.MY_API_KEY
   })
-  await forkRequest(srcUsername, username, repoName, octokit)
-  const branch_SHA_ID = await getBranchesRequest(srcUsername, repoName, octokit, pkgName)
-  await createBranchRequest(srcUsername, repoName, octokit, pkgName, branch_SHA_ID)
-  const JSON_SHA_ID = await getRepoContent(srcUsername, repoName, octokit)
-  await updateRepoContent(srcUsername, repoName, octokit, metaData, JSON_SHA_ID, version, pkgVersion, pkgName)
-  const pr = await createPullRequest(username, srcUsername, repoName, octokit, pkgName, version, pkgVersion)
+  await forkRequest(srcUserDetails, username, repoName, octokit)
+  const branch_SHA_ID = await getBranchesRequest(srcUserDetails, repoName, octokit, pkgName)
+  await createBranchRequest(srcUserDetails, repoName, octokit, pkgName, branch_SHA_ID)
+  const JSON_SHA_ID = await getRepoContent(srcUserDetails, repoName, octokit)
+  await updateRepoContent(srcUserDetails, repoName, octokit, metaData, JSON_SHA_ID, version, pkgVersion, pkgName)
+  const pr = await createPullRequest(username, srcUserDetails, repoName, octokit, pkgName, version, pkgVersion)
 
 
   return pr
 }
 
-async function forkRequest(srcUsername, username, repoName, octokit){
+async function forkRequest(srcUserDetails, username, repoName, octokit){
 
   const response = await octokit.request(`POST /repos/${username}/${repoName}/forks`, {
-    owner: srcUsername,
+    owner: srcUserDetails.srcUsername,
     repo: repoName
   })
 
   console.log(`Sucessfully forked ${repoName}`)
 }
 
-async function getBranchesRequest(srcUsername, repoName, octokit, pkgName){
+async function getBranchesRequest(srcUserDetails, repoName, octokit, pkgName){
 
-  const response = await octokit.request(`GET /repos/${srcUsername}/${repoName}/branches`, {
-    owner: srcUsername ,
+  const response = await octokit.request(`GET /repos/${srcUserDetails.srcUsername}/${repoName}/branches`, {
+    owner: srcUserDetails.srcUsername ,
     repo: repoName
   })
 
@@ -78,10 +77,10 @@ async function getBranchesRequest(srcUsername, repoName, octokit, pkgName){
 
 }
 
-async function createBranchRequest(srcUsername, repoName, octokit, branchName, branch_SHA_ID){
+async function createBranchRequest(srcUserDetails, repoName, octokit, branchName, branch_SHA_ID){
 
-  const response = await octokit.request(`POST /repos/${srcUsername}/${repoName}/git/refs`, {
-    owner: srcUsername,
+  const response = await octokit.request(`POST /repos/${srcUserDetails.srcUsername}/${repoName}/git/refs`, {
+    owner: srcUserDetails.srcUsername,
     repo: repoName,
     ref: `refs/heads/${branchName}`,
     sha: branch_SHA_ID
@@ -91,10 +90,10 @@ async function createBranchRequest(srcUsername, repoName, octokit, branchName, b
 
 }
 
-async function getRepoContent(srcUsername, repoName, octokit){
+async function getRepoContent(srcUserDetails, repoName, octokit){
 
-  const response = await octokit.request(`GET /repos/${srcUsername}/${repoName}/contents/package.json`, {
-    owner: srcUsername,
+  const response = await octokit.request(`GET /repos/${srcUserDetails.srcUsername}/${repoName}/contents/package.json`, {
+    owner: srcUserDetails.srcUsername,
     repo: repoName,
     path: 'package.json',
   })
@@ -103,21 +102,19 @@ async function getRepoContent(srcUsername, repoName, octokit){
 
 }
 
-async function updateRepoContent(srcUsername, repoName, octokit, metaData, JSON_SHA_ID, version, pkgVersion, pkgName){
+async function updateRepoContent(srcUserDetails, repoName, octokit, metaData, JSON_SHA_ID, version, pkgVersion, pkgName){
 
   const metaDataStr = JSON.stringify(metaData)
   const metaDataB64 = Buffer.from(metaDataStr).toString("base64")
-  const fullname = prompt("Enter your full name : ")
-  const email = prompt("Enter your email linked with Github : ")
-  const response = await octokit.request(`PUT /repos/dystopiadroid/${repoName}/contents/package.json`, {
-    owner: srcUsername,
+  const response = await octokit.request(`PUT /repos/${srcUserDetails.srcUsername}/${repoName}/contents/package.json`, {
+    owner: srcUserDetails.srcUsername,
     repo: repoName,
     path: 'package.json',
     branch: pkgName,
     message : `Updates the version of axios from ${version.substring(1)} to ${pkgVersion}`,
     committer: {
-      name: fullname,
-      email: email
+      name: srcUserDetails.fullname,
+      email: srcUserDetails.email
     },
     content: metaDataB64,
     sha : JSON_SHA_ID
@@ -127,14 +124,14 @@ async function updateRepoContent(srcUsername, repoName, octokit, metaData, JSON_
 
 }
 
-async function createPullRequest(username, srcUsername, repoName, octokit, pkgName, version, pkgVersion){
+async function createPullRequest(username, srcUserDetails, repoName, octokit, pkgName, version, pkgVersion){
 
   const response = await octokit.request(`POST /repos/${username}/${repoName}/pulls`, {
-    owner: srcUsername,
+    owner: srcUserDetails.srcUsername,
     repo: repoName,
     title: `chore: updates ${pkgName} to ${pkgVersion}`,
     body: `Updates the version of ${pkgName} from ${version.substring(1)} to ${pkgVersion}`,
-    head: `${srcUsername}:${pkgName}`,
+    head: `${srcUserDetails.srcUsername}:${pkgName}`,
     base: 'main'
   })
 
@@ -159,16 +156,22 @@ function main() {
     onError : () => {console.log("Usage: node . -update -i <CSV-file> <depName@minVersion>")}
   }
 
+    const srcUserDetails = {
+    srcUsername : updateArg.isPresent() ? prompt("Enter your github username : ") : null,
+    fullname : updateArg.isPresent() ? prompt("Enter your full name : ") : null,
+    email : updateArg.isPresent() ? prompt("Enter your email linked with Github : ") : null
+    }
+
   fs.createReadStream(fileName)
     .on("error", () => { console.log(`Error reading from ${fileName}`) })
     .pipe(csvParser({ demiliter: ",", from_line: 1 }))
     .on("data", 
-    (row) => checkPkgVersion(row, pkgName, pkgVersion, updateArg)
+    (row) => checkPkgVersion(row, pkgName, pkgVersion, updateArg, srcUserDetails)
     )
 
 setTimeout(() => {
   printTable(checkVersiondata)
-}, [8000])
+}, [4000])
 
 }
 
