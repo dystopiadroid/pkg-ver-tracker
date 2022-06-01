@@ -71,10 +71,15 @@ async function pullRequest(repo, version, pkgVersion, pkgName, srcUserDetails){
 
 function main() { 
 
+  const cmd = {
+    i : "pkg-version-tracker -i <CSV-file> <depName@minVersion>",
+    update : "pkg-version-tracker -update -i <CSV-file> <depName@minVersion>"
+  }
+
   //  error handling for cmd args
   if (!(process.argv.indexOf("-i")+1)) 
   { 
-    console.log("Usage: pkg-version-tracker -i <CSV-file> <depName@minVersion>"); 
+    console.log(`Usage: ${cmd.i}`); 
     return;
   }
 
@@ -86,7 +91,7 @@ function main() {
   const updateArg = {
     index : process.argv.indexOf("-i") - 1 ,
     isPresent : function isPresent(){ return (process.argv[this.index] == "-update") ? true : false } ,
-    onError : () => {console.log("Usage: pkg-version-tracker -update -i <CSV-file> <depName@minVersion>")}
+    onError : () => {console.log(`Usage: ${cmd.update}`)}
   }
 
   //  initializing user details for further git related operations
