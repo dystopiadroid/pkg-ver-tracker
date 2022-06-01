@@ -44,10 +44,10 @@ async function pullRequest(name, repo, version, pkgVersion, pkgName){
   const srcUsername = prompt("Enter your github username : ")
 
   const octokit = new Octokit({
-    auth: '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'
+    auth: process.env.MY_API_KEY
   })
   await forkRequest(srcUsername, username, repoName, octokit)
-  const branch_SHA_ID = await getBranchesRequest(srcUsername, repoName, octokit)
+  const branch_SHA_ID = await getBranchesRequest(srcUsername, repoName, octokit, pkgName)
   await createBranchRequest(srcUsername, repoName, octokit, pkgName, branch_SHA_ID)
   const JSON_SHA_ID = await getRepoContent(srcUsername, repoName, octokit)
   await updateRepoContent(srcUsername, repoName, octokit, metaData, JSON_SHA_ID, version, pkgVersion, pkgName)
@@ -64,10 +64,10 @@ async function forkRequest(srcUsername, username, repoName, octokit){
     repo: repoName
   })
 
-  // console.log(response)
+  console.log(`Sucessfully forked ${repoName}`)
 }
 
-async function getBranchesRequest(srcUsername, repoName, octokit){
+async function getBranchesRequest(srcUsername, repoName, octokit, pkgName){
 
   const response = await octokit.request(`GET /repos/${srcUsername}/${repoName}/branches`, {
     owner: srcUsername ,
@@ -86,6 +86,8 @@ async function createBranchRequest(srcUsername, repoName, octokit, branchName, b
     ref: `refs/heads/${branchName}`,
     sha: branch_SHA_ID
   })
+
+  console.log(`Created a new branch named ${branchName} in the forked repo ${repoName}`)
 
 }
 
@@ -121,11 +123,13 @@ async function updateRepoContent(srcUsername, repoName, octokit, metaData, JSON_
     sha : JSON_SHA_ID
   })
 
+  console.log(`Updated the ${pkgName} dependency in package.json from ${version.substring(1)} --> ${pkgVersion}`)
+
 }
 
 async function createPullRequest(username, srcUsername, repoName, octokit, pkgName, version, pkgVersion){
 
-  const response = await octokit.request(`POST /repos/${srcUsername}/${repoName}/pulls`, {
+  const response = await octokit.request(`POST /repos/${username}/${repoName}/pulls`, {
     owner: srcUsername,
     repo: repoName,
     title: `chore: updates ${pkgName} to ${pkgVersion}`,
@@ -134,6 +138,7 @@ async function createPullRequest(username, srcUsername, repoName, octokit, pkgNa
     base: 'main'
   })
 
+  console.log("Successfully generated the pull request")
   return response.data.html_url  
 
 }
@@ -157,11 +162,13 @@ function main() {
   fs.createReadStream(fileName)
     .on("error", () => { console.log(`Error reading from ${fileName}`) })
     .pipe(csvParser({ demiliter: ",", from_line: 1 }))
-    .on("data", (row) =>checkPkgVersion(row, pkgName, pkgVersion, updateArg))
+    .on("data", 
+    (row) => checkPkgVersion(row, pkgName, pkgVersion, updateArg)
+    )
 
 setTimeout(() => {
   printTable(checkVersiondata)
-}, [3000])
+}, [8000])
 
 }
 
