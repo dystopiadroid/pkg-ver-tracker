@@ -1,3 +1,6 @@
+  //  ----------------------  Using Github API with the help of Octokit  -------------------------------------------
+
+  //  creating a fork of the specificied repo
   async function forkRequest(srcUserDetails, username, repoName, octokit){
 
       const response = await octokit.request(`POST /repos/${username}/${repoName}/forks`, {
@@ -8,6 +11,7 @@
       console.log(`Sucessfully forked ${repoName}`)
     }
     
+    //  fetching the SHA_ID of existing branches in order to create a new brach
     async function getBranchesRequest(srcUserDetails, repoName, octokit, pkgName){
     
       const response = await octokit.request(`GET /repos/${srcUserDetails.srcUsername}/${repoName}/branches`, {
@@ -19,6 +23,7 @@
     
     }
     
+    //  using refs to create a new branch with the same name as the dep which needs to be updated 
     async function createBranchRequest(srcUserDetails, repoName, octokit, branchName, branch_SHA_ID){
     
       const response = await octokit.request(`POST /repos/${srcUserDetails.srcUsername}/${repoName}/git/refs`, {
@@ -32,6 +37,7 @@
     
     }
     
+    //  fetching the package.json contents (default : base64 encoded)
     async function getRepoContent(srcUserDetails, repoName, octokit){
     
       const response = await octokit.request(`GET /repos/${srcUserDetails.srcUsername}/${repoName}/contents/package.json`, {
@@ -44,16 +50,19 @@
     
     }
     
+    //  changing the package.jsom contents and updating it in the same base64 format 
     async function updateRepoContent(srcUserDetails, repoName, octokit, metaData, JSON_SHA_ID, version, pkgVersion, pkgName){
     
+      //Encoding to Base64 format
       const metaDataStr = JSON.stringify(metaData)
       const metaDataB64 = Buffer.from(metaDataStr).toString("base64")
+
       const response = await octokit.request(`PUT /repos/${srcUserDetails.srcUsername}/${repoName}/contents/package.json`, {
         owner: srcUserDetails.srcUsername,
         repo: repoName,
         path: 'package.json',
         branch: pkgName,
-        message : `Updates the version of axios from ${version.substring(1)} to ${pkgVersion}`,
+        message : `Updates the version of axios from ${version.substring(1)} to ${pkgVersion}`,     //  commit message
         committer: {
           name: srcUserDetails.fullname,
           email: srcUserDetails.email
@@ -66,6 +75,7 @@
     
     }
     
+    //  generating the pull request 
     async function createPullRequest(username, srcUserDetails, repoName, octokit, pkgName, version, pkgVersion){
     
       const response = await octokit.request(`POST /repos/${username}/${repoName}/pulls`, {
@@ -78,6 +88,8 @@
       })
     
       console.log("Successfully generated the pull request")
+
+      //  returning the pr link to the table
       return response.data.html_url  
     
     }
