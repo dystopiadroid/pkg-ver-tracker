@@ -8,12 +8,18 @@
         repo: repoName
       })
     
+      setTimeout(() => {
+
+      }, [5000])
+
       console.log(`Sucessfully forked ${repoName}`)
+
     }
     
     //  fetching the SHA_ID of existing branches in order to create a new brach
     async function getBranchesRequest(srcUserDetails, repoName, octokit, pkgName){
     
+
       const response = await octokit.request(`GET /repos/${srcUserDetails.srcUsername}/${repoName}/branches`, {
         owner: srcUserDetails.srcUsername ,
         repo: repoName
@@ -26,6 +32,7 @@
     //  using refs to create a new branch with the same name as the dep which needs to be updated 
     async function createBranchRequest(srcUserDetails, repoName, octokit, branchName, branch_SHA_ID){
     
+
       const response = await octokit.request(`POST /repos/${srcUserDetails.srcUsername}/${repoName}/git/refs`, {
         owner: srcUserDetails.srcUsername,
         repo: repoName,
@@ -53,6 +60,7 @@
     //  changing the package.jsom contents and updating it in the same base64 format 
     async function updateRepoContent(srcUserDetails, repoName, octokit, metaData, JSON_SHA_ID, version, pkgVersion, pkgName){
     
+
       //Encoding to Base64 format
       const metaDataStr = JSON.stringify(metaData)
       const metaDataB64 = Buffer.from(metaDataStr).toString("base64")
@@ -77,7 +85,7 @@
     
     //  generating the pull request 
     async function createPullRequest(username, srcUserDetails, repoName, octokit, pkgName, version, pkgVersion){
-    
+
       const response = await octokit.request(`POST /repos/${username}/${repoName}/pulls`, {
         owner: srcUserDetails.srcUsername,
         repo: repoName,
