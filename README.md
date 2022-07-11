@@ -1,5 +1,5 @@
 
-# Dyte-Task (pkg-ver-tracker)
+# pkg-ver-tracker
 
 #### *-------------------------------------Edit : Now available on npm registry ----------------------------------------------*
 
